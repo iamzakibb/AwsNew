@@ -1,13 +1,16 @@
 data "aws_caller_identity" "current" {}
 
+module "networking" {
+  source           = "./modules/networking"
+}
 
 module "ecs" {
   source                 = "./modules/ecs"
   cluster_name           = "dotnet-app-cluster"
-  vpc_id                 = ""
-  subnet_ids             = ["",""]
+  vpc_id                 = module.networking.vpc_id
+  subnet_ids             = module.networking.subnet_ids
   container_image        = var.image_name
-  security_group_ids     = [""]
+  security_group_ids     = [aws_security_group.ecs_service.id]
   alb_target_group_arn   = null
 
 }
