@@ -1,47 +1,91 @@
-# VPC Definition
+# Variable for tags
+variable "tags" {
+  type        = map(string)
+  description = "A map of tags to apply to networking resources."
+}
+
+# VPC
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
+  cidr_block = var.cidr_block
   enable_dns_support   = true
   enable_dns_hostnames = true
+
+  tags = merge(var.tags, { Name = "${var.name}-vpc" })
 }
 
-# Public Subnets in Different AZs
-resource "aws_subnet" "public_subnet_a" {
-  vpc_id             = aws_vpc.main.id
-  cidr_block         = "10.0.1.0/24"
-  availability_zone  = "us-east-1a"
+# Public Subnet
+resource "aws_subnet" "public" {
+  count           = var.public_subnet_count
+  vpc_id          = aws_vpc.main.id
+  cidr_block      = element(var.public_subnet_cidrs, count.index)
+  availability_zone = element(var.availability_zones, count.index)
   map_public_ip_on_launch = true
+
+  tags = merge(var.tags, { Name = "${var.name}-public-subnet-${count.index}" })
 }
 
-resource "aws_subnet" "public_subnet_b" {
-  vpc_id             = aws_vpc.main.id
-  cidr_block         = "10.0.2.0/24"
-  availability_zone  = "us-east-1b"
-  map_public_ip_on_launch = true
+# Private Subnet
+resource "aws_subnet" "private" {
+  count           = var.private_subnet_count
+  vpc_id          = aws_vpc.main.id
+  cidr_block      = element(var.private_subnet_cidrs, count.index)
+  availability_zone = element(var.availability_zones, count.index)
+
+  tags = merge(var.tags, { Name = "${var.name}-private-subnet-${count.index}" })
 }
 
-# Internet Gateway for the VPC
-resource "aws_internet_gateway" "igw" {
+# Internet Gateway
+resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
+
+  tags = merge(var.tags, { Name = "${var.name}-igw" })
 }
 
-# Public Route Table
-resource "aws_route_table" "public_rt" {
+# Route Table for Public Subnets
+resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
-  
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
+
+  tags = merge(var.tags, { Name = "${var.name}-public-rt" })
 }
 
-# Associating the Route Table with Public Subnets
-resource "aws_route_table_association" "public_subnet_rt_assoc_a" {
-  subnet_id      = aws_subnet.public_subnet_a.id
-  route_table_id = aws_route_table.public_rt.id
+resource "aws_route_table_association" "public" {
+  count          = var.public_subnet_count
+  subnet_id      = element(aws_subnet.public.*.id, count.index)
+  route_table_id = aws_route_table.public.id
 }
 
-resource "aws_route_table_association" "public_subnet_rt_assoc_b" {
-  subnet_id      = aws_subnet.public_subnet_b.id
-  route_table_id = aws_route_table.public_rt.id
+# NAT Gateway
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = element(aws_subnet.public.*.id, 0) # Assuming the first public subnet
+  connectivity_type = "public"
+
+  tags = merge(var.tags, { Name = "${var.name}-nat" })
+}
+
+# Elastic IP for NAT Gateway
+resource "aws_eip" "nat" {
+  vpc = true
+
+  tags = merge(var.tags, { Name = "${var.name}-eip" })
+}
+
+# Route Table for Private Subnets
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(var.tags, { Name = "${var.name}-private-rt" })
+}
+
+resource "aws_route_table_association" "private" {
+  count          = var.private_subnet_count
+  subnet_id      = element(aws_subnet.private.*.id, count.index)
+  route_table_id = aws_route_table.private.id
+}
+
+# Private Routes for NAT Gateway
+resource "aws_route" "private_nat" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.main.id
 }

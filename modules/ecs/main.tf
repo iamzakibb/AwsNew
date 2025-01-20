@@ -1,4 +1,4 @@
-# Simplified IAM Role for ECS Tasks
+# IAM Role for ECS Tasks
 data "aws_iam_policy_document" "ecs_task_assume_role" {
   statement {
     effect = "Allow"
@@ -13,6 +13,8 @@ data "aws_iam_policy_document" "ecs_task_assume_role" {
 resource "aws_iam_role" "ecs_task_role" {
   name               = "ecs-task-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
+
+  tags = var.tags
 }
 
 # Attach Policies to ECS Task Role
@@ -45,11 +47,15 @@ resource "aws_iam_policy" "ecr_access_policy" {
       }
     ]
   })
+
+  tags = var.tags
 }
 
 # ECS Cluster Definition
 resource "aws_ecs_cluster" "main" {
   name = var.cluster_name
+
+  tags = var.tags
 }
 
 # ECS Task Definition
@@ -73,6 +79,8 @@ resource "aws_ecs_task_definition" "main" {
       }
     ]
   }])
+
+  tags = var.tags
 }
 
 # ECS Service Definition
@@ -82,16 +90,18 @@ resource "aws_ecs_service" "main" {
   task_definition = aws_ecs_task_definition.main.arn
   desired_count   = 1
   launch_type     = "FARGATE"
-#
+
   network_configuration {
     subnets         = var.subnet_ids
     security_groups = var.security_group_ids
     assign_public_ip = true
   }
-    load_balancer {
+
+  load_balancer {
     target_group_arn = var.alb_target_group_arn
     container_name   = "dotnet-container"
     container_port   = 8080
   }
-}
 
+  tags = var.tags
+}

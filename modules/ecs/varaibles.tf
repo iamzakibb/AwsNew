@@ -5,6 +5,10 @@ variable "cluster_name" {
   type        = string
   default = "dev-cluster90909ff"
 }
+variable "tags" {
+  type        = map(string)
+  description = "A map of tags to apply to all resources."
+}
 
 variable "vpc_id" {
   description = "VPC ID where ECS resources will be deployed"
