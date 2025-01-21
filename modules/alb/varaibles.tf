@@ -19,3 +19,6 @@ variable "tags" {
   type        = map(string)
   description = "A map of tags to apply to all resources."
 }
+variable "ssl_policy" {
+  default = "ELBSecurityPolicy-2016-08"
+}

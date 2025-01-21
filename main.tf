@@ -1,18 +1,33 @@
 data "aws_caller_identity" "current" {}
 
+data "aws_ecr_repository" "main" {
+  name = var.ecr_repository_name
+}
+# Reference outputs from the networking module
+data "aws_vpc" "selected" {
+  id = module.networking.vpc_id
+}
+
+locals {
+  trusted_cidr_blocks = concat(
+    module.networking.public_subnet_cidrs,
+    module.networking.private_subnet_cidrs
+  )
+}
+
 module "networking" {
   source           = "./modules/networking"
   
   # Example input values
-  name                 = "my-network"
-  cidr_block           = "192.168.0.0/16"
-  availability_zones   = ["us-west-1a", "us-west-1b"]
-  public_subnet_count  = 2
-  public_subnet_cidrs  = ["192.168.1.0/24", "192.168.2.0/24"]
-  private_subnet_count = 2
-  private_subnet_cidrs = ["192.168.3.0/24", "192.168.4.0/24"]
-  create_nat_gateway   = true
-  create_internet_gateway = true
+  name                = var.name
+  cidr_block          = var.cidr_block
+  public_subnet_count = var.public_subnet_count
+  public_subnet_cidrs = var.public_subnet_cidrs
+  private_subnet_count = var.private_subnet_count
+  private_subnet_cidrs = var.private_subnet_cidrs
+  availability_zones  = var.availability_zones
+  create_nat_gateway   = var.create_nat_gateway
+  create_internet_gateway = var.create_internet_gateway
 
   # Passing required tags
   tags = var.tags
@@ -23,41 +38,52 @@ module "ecs" {
   cluster_name           = "dotnet-app-cluster"
   vpc_id                 = module.networking.vpc_id
   subnet_ids             = module.networking.subnet_ids
-  container_image        = var.image_name
+  container_image        ="${data.aws_ecr_repository.main.repository_uri}:latest" 
   security_group_ids     = [aws_security_group.ecs_service.id]
   alb_target_group_arn   = null
   tags                   = var.tags
 }
 
 module "alb" {
-  source                = "./modules/alb"
-  vpc_id                = module.networking.vpc_id
-  subnet_ids            = module.networking.subnet_ids
-  security_group_id     = [aws_security_group.alb.id]
-  ecs_service_private_ips = module.ecs.private_ips  
-  tags                   = var.tags
+  source = "./modules/alb-pattern"
+
+  identifier       = var.identifier
+  vpc_id           = var.vpc_id
+  subnet_ids       = var.subnet_ids
+  target_type      = var.target_type
+  tg_port          = var.tg_port
+  tg_protocol      = var.tg_protocol
+  lb_port          = var.lb_port
+  lb_protocol      = var.lb_protocol
+  ssl_policy       = var.ssl_policy
 }
 
+# ECS Service Security Group
 resource "aws_security_group" "ecs_service" {
   name        = "ecs-service-sg"
   description = "Security group for ECS service"
   vpc_id      = module.networking.vpc_id
 
   ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-   security_groups = [aws_security_group.alb.id]
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id] # ALB communicates with ECS
   }
- 
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = local.trusted_cidr_blocks # Dynamically fetched trusted CIDRs
+  }
+
+  tags = {
+    Name = "ecs-service-sg"
   }
 }
+
+# ALB Security Group
 resource "aws_security_group" "alb" {
   name        = "alb-sg"
   description = "Security group for ALB"
@@ -67,16 +93,28 @@ resource "aws_security_group" "alb" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Allows HTTP traffic from the internet
+    cidr_blocks = local.trusted_cidr_blocks # Dynamically fetched trusted CIDRs
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = local.trusted_cidr_blocks # Dynamically fetched trusted CIDRs
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs_service.id] # Allow traffic to ECS service
+  }
+
+  tags = {
+    Name = "alb-sg"
   }
 }
+
 
 
 
