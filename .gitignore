@@ -4,10 +4,10 @@ project.lock.json
 .DS_Store
 *.pyc
 nupkg/
-
+*.terraform
 # Visual Studio Code
 .vscode
-
+.gitignore
 # Rider
 .idea
 

@@ -45,17 +45,13 @@ module "ecs" {
 }
 
 module "alb" {
-  source = "./modules/alb-pattern"
-
-  identifier       = var.identifier
-  vpc_id           = var.vpc_id
-  subnet_ids       = var.subnet_ids
-  target_type      = var.target_type
-  tg_port          = var.tg_port
-  tg_protocol      = var.tg_protocol
-  lb_port          = var.lb_port
-  lb_protocol      = var.lb_protocol
+  source = "./modules/alb"
+  vpc_id           = module.networking.vpc_id
+  subnet_ids       = module.networking.subnet_ids
+  ecs_service_private_ips = module.ecs.private_ips
+  security_group_id     = [aws_security_group.alb.id]
   ssl_policy       = var.ssl_policy
+  tags = var.tags
 }
 
 # ECS Service Security Group
