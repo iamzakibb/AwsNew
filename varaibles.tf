@@ -66,15 +66,15 @@ variable "create_internet_gateway" {
 variable "ecr_repository_name" {
   description = "The name of the ECR repository"
   type        = string
-  default     = ""
+  default     = "firstdemorepo"
   
 }
 variable "aws_region" {
   default = "us-gov-west-1"
 }
-variable "image_name" {
-  default = ""
-}
+# variable "image_name" {
+#   default = ""
+# }
 variable "tg_port" {
   default = "80"
 }
