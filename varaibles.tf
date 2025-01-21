@@ -5,7 +5,7 @@ variable "environment" {
 }
 variable "tags" {
   default = {
-    "CI Environment"          = "production" # Change based on your environment
+    "CI Environment"          = "development" # Change based on your environment
     "Information Classification" = "confidential"
     "AppServiceTag"           = "approved-value" # Replace 'approved-value' with a valid value
   }
@@ -25,7 +25,7 @@ variable "cidr_block" {
 variable "availability_zones" {
   description = "List of availability zones"
   type        = list(string)
-  default     = ["us-west-1a", "us-west-1b"]
+  default     = ["us-east-1a", "us-east-1b", "us-east-1c"] #
 }
 
 variable "public_subnet_count" {
@@ -70,7 +70,7 @@ variable "ecr_repository_name" {
   
 }
 variable "aws_region" {
-  default = "us-gov-west-1"
+  default = "us-east-1"
 }
 # variable "image_name" {
 #   default = ""
@@ -99,4 +99,8 @@ variable "trusted_cidr_blocks" {
   type        = list(string)
   description = "List of trusted CIDR blocks for ALB and ECS communication"
   default     = ["192.168.0.0/16"] 
+}
+variable "cluster_name" {
+  default = "dotnet-app-cluster"
+  
 }

@@ -10,7 +10,10 @@ nupkg/
 .gitignore
 # Rider
 .idea
-
+.terraform
+*.tfstate
+*.tfstate.backup
+*.gitignore
 # User-specific files
 *.suo
 *.user
